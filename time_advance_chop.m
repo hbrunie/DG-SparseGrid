@@ -1,4 +1,4 @@
-function f = time_advance(pde,opts,A_data,f,t,dt,deg,hash_table,Vmax,Emax)
+function f = time_advance_chop(pde,opts,A_data,f,t,dt,deg,hash_table,Vmax,Emax)
 
 if strcmp(opts.timestep_method,'BE')
     % Backward Euler (BE) first order
@@ -123,59 +123,150 @@ end
 
 %% 3-rd Order Kutta Method (explicit time advance)
 function fval = RungeKutta3(pde,opts,A_data,f,t,dt,deg,hash_table,Vmax,Emax)
+options.format = 'h'; options.round = 1; options.subnormal = 1;
+chop([],options)
+%Convert pde to single
+%disp(fieldnames(pde));
+for d=1:numel(pde.dimensions)
+    pde_s.dimensions{d}.name = pde.dimensions{d}.name;
+    pde_s.dimensions{d}.min = pde.dimensions{d}.min;
+    pde_s.dimensions{d}.max = pde.dimensions{d}.max;
+    pde_s.dimensions{d}.lev = pde.dimensions{d}.lev;
+    %function handle
+    %pde_s.dimensions{d}.init_cond_fn =pde.dimensions{d}.init_cond_fn;
+    %pde_s.dimensions{d}.jacobian = chop(pde.dimensions{d}.jacobian);
+    pde_s.dimensions{d}.init_cond_fn =pde.dimensions{d}.init_cond_fn;
+    pde_s.dimensions{d}.jacobian =pde.dimensions{d}.jacobian;
+end
 
+%COnversion from MD_TERM to chop not possible
+%for d=1:numel(pde.terms)
+%    pde_s.terms{d}      = chop(pde.terms{d});
+%end
+pde_s.terms      = pde.terms;
+
+%Conversion to chop from struct is not possible
+%for d=1:numel(pde.params)
+%    pde_s.params     = chop(pde.params);
+%end
+pde_s.params     =pde.params;
+
+for d=1:numel(pde.sources)
+    pde_s.sources{d}    = chop(pde.sources{d});
+end
+pde_s.sources    =pde.sources;
+pde_s.transform_blocks    =pde.transform_blocks;
+
+pde_s.termsLHS   = chop(pde.termsLHS);
+for d=1:numel(pde.boundary_conditions)
+    pde_s.boundary_conditions{d} = chop(pde.boundary_conditions{d});
+end
+%Conversion to chop from cell is not possible
+%for d=1:numel(pde.initial_conditions)
+%    pde_s.initial_conditions{d} = chop(pde.initial_conditions{d});
+%end
+%pde_s.solutions = chop(pde.solutions);
+%pde_s.connectivity = chop(pde.connectivity);
+pde_s.initial_conditions =pde.initial_conditions;
+pde_s.solutions =pde.solutions;
+pde_s.connectivity =pde.connectivity;
+num_terms     = numel(pde.terms);
+num_terms_LHS = numel(pde.termsLHS);
+num_dims      = numel(pde.dimensions);
+for t=1:num_terms
+    for d=1:num_dims
+        pde_s.terms{t}.terms_1D{d}.mat = chop(pde.terms{t}.terms_1D{d}.mat);
+    end
+end
+
+
+%Convert A_data to chop
 dims = pde.dimensions;
+nDims = numel(dims);
+A_data_s.element_global_row_index = chop(A_data.element_global_row_index);
+for d=1:nDims
+    A_data_s.element_local_index_D{d} = chop(A_data.element_local_index_D{d});
+end
+%convert f, t, dt, deg, hash_table, Vmax,Emax to chop
+f_s = chop(f);
+t_s = chop(t);
+dt_s = chop(dt);
+deg_s = chop(deg);
+%struct not possible
+%hash_table_s = chop(hash_table);
+hash_table_s =hash_table;
+Vmax_s = chop(Vmax);
+Emax_s = chop(Emax);
+
+%disp(sprintf('RK3 class of A_data is %s', class(A_data.element_global_row_index) ));
+%for d=1:nDims
+%    disp(sprintf('RK3 class of A_data is %s', class(A_data.element_local_index_D{d}) ));
+%end
+%disp(sprintf('RK3 class of A_data_s is %s', class(A_data_s.element_global_row_index) ));
+%for d=1:nDims
+%    disp(sprintf('RK3 class of A_data_s is %s', class(A_data_s.element_local_index_D{d}) ));
+%end
 
 %%
 % Sources
-c2 = 1/2; c3 = 1;
-source1 = source_vector(pde,opts,hash_table,t);
-source2 = source_vector(pde,opts,hash_table,t+c2*dt);
-source3 = source_vector(pde,opts,hash_table,t+c3*dt);
+c2 = chop(1/2); c3 = chop(1);
+source1 = source_vector(pde_s,opts,hash_table_s,t_s);
+source2 = source_vector(pde_s,opts,hash_table_s,t_s+c2*dt_s);
+source3 = source_vector(pde_s,opts,hash_table_s,t_s+c3*dt_s);
 
 %%
 % Inhomogeneous dirichlet boundary conditions
-bc1 = boundary_condition_vector(pde,opts,hash_table,t);
-bc2 = boundary_condition_vector(pde,opts,hash_table,t+c2*dt);
-bc3 = boundary_condition_vector(pde,opts,hash_table,t+c3*dt);
+bc1 = boundary_condition_vector(pde_s,opts,hash_table_s,t_s);
+bc2 = boundary_condition_vector(pde_s,opts,hash_table_s,t_s+c2*dt_s);
+bc3 = boundary_condition_vector(pde_s,opts,hash_table_s,t_s+c3*dt_s);
 
 % %%
 % Apply any non-identity LHS mass matrix coefficient
 
 applyLHS = ~isempty(pde.termsLHS);
 
-a21 = 1/2; a31 = -1; a32 = 2;
-b1 = 1/6; b2 = 2/3; b3 = 1/6;
+a21 = chop(1/2); a31 = chop(-1); a32 = chop(2);
+b1 = chop(1/6); b2 =  chop(2/3); b3 = chop(1/6);
 %disp_x = [a21,a31,a32,b1,b2,b3]
 %disp(disp_x)
 
 if applyLHS
-    [k1,A1,ALHS] = apply_A(pde,opts,A_data,f,deg,Vmax,Emax);
+    [k1,A1,ALHS] = apply_A_chop(pde_s,opts,A_data_s,f_s,deg_s,Vmax_s,Emax_s);
     rhs1 = source1 + bc1;
     %     invMatLHS = inv(ALHS); % NOTE : assume time independent for now for speed.
     %     k1 = invMatLHS * (k1 + rhs1);
     k1 = ALHS \ (k1 + rhs1);
-    y1 = f + dt*a21*k1;
+    y1 = f_s + dt_s*a21*k1;
     
-    [k2] = apply_A(pde,opts,A_data,y1,deg,Vmax,Emax);
+    [k2] = apply_A_chop(pde_s,opts,A_data_s,y1,deg_s,Vmax_s,Emax_s);
     rhs2 = source2 + bc2;
     %     k2 = invMatLHS * (k2 + rhs2);
     k2 = ALHS \ (k2 + rhs2);
-    y2 = f + dt*(a31*k1 + a32*k2);
+    y2 = f_s + dt_s*(a31*k1 + a32*k2);
     
-    k3 = apply_A(pde,opts,A_data,y2,deg,Vmax,Emax);
+    k3 = apply_A_chop(pde_s,opts,A_data_s,y2,deg_s,Vmax_s,Emax_s);
     rhs3 = source3 + bc3;
     %     k3 = invMatLHS * (k3 + rhs3);
     k3 = ALHS \ (k3 + rhs3);
 else
-    k1 = apply_A(pde,opts,A_data,f,deg,Vmax,Emax)  + source1 + bc1;
-    y1 = f + dt*a21*k1;
-    k2 = apply_A(pde,opts,A_data,y1,deg,Vmax,Emax) + source2 + bc2;
-    y2 = f + dt*(a31*k1 + a32*k2);
-    k3 = apply_A(pde,opts,A_data,y2,deg,Vmax,Emax) + source3 + bc3;
+    k1 = apply_A_chop(pde_s,opts,A_data_s,f_s,deg_s,Vmax_s,Emax_s)  + source1 + bc1;
+    y1 = f_s + dt_s*a21*k1;
+    k2 = apply_A_chop(pde_s,opts,A_data_s,y1,deg_s,Vmax_s,Emax_s) + source2 + bc2;
+    y2 = f_s + dt_s*(a31*k1 + a32*k2);
+    k3 = apply_A_chop(pde_s,opts,A_data_s,y2,deg_s,Vmax_s,Emax_s) + source3 + bc3;
 end
 
-fval = f + dt*(b1*k1 + b2*k2 + b3*k3);
+fval = double(f_s + dt_s*(b1*k1 + b2*k2 + b3*k3));
+%disp(sprintf('RK3 class of all data is %s %s %s %s %s %s %s %s', class(f),class(dt),class(k1),class(b2),class(k2),class(k3),class(b3),class(fval) ));
+%
+%disp(sprintf('RK3 class of A_data is %s', class(A_data.element_global_row_index) ));
+%for d=1:nDims
+%    disp(sprintf('RK3 class of A_data is %s', class(A_data.element_local_index_D{d}) ));
+%end
+%disp(sprintf('RK3 class of A_data_s is %s', class(A_data_s.element_global_row_index) ));
+%for d=1:nDims
+%    disp(sprintf('RK3 class of A_data_s is %s', class(A_data_s.element_local_index_D{d}) ));
+%end
 
 end
 

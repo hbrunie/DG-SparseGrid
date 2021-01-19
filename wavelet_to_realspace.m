@@ -58,6 +58,7 @@ for i=1:num_elements
    
     element_ii = deg^nDims*(i-1)+1:deg^nDims*i;
     
+    %disp(sprintf('class of f_Wspace is %s', class(f_wSpace) ));
     X = f_wSpace(element_ii);
 
     if use_kronmultd
@@ -65,8 +66,7 @@ for i=1:num_elements
     else
         Y = kron_multd_full(nDims,kron_mat_list,X);
     end
-        
-    f_rSpace = f_rSpace + Y;
+    f_rSpace =f_rSpace +Y;
     
 end
 

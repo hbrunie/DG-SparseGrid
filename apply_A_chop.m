@@ -1,10 +1,12 @@
-function [ftmp, A, ALHS] = apply_A (pde,opts,A_data,f,deg,Vmax,Emax)
+function [ftmp, A, ALHS] = apply_A_chop (pde,opts,A_data,f,deg,Vmax,Emax)
 %disp(sprintf('A_data(1) class is %s', class(A_data.element_global_row_index) ));
-%dims = pde.dimensions;
-%nDims = numel(dims);
+dims = pde.dimensions;
+nDims = numel(dims);
 %for d=1:nDims
 %    disp(sprintf('A_data(1) class is %s', class(A_data.element_local_index_D{d}) ));
 %end
+options.format = 'h'; options.round = 1; options.subnormal = 1;
+chop([],options)
 
 %-----------------------------------
 % Multiply Matrix A by Vector f
@@ -28,7 +30,7 @@ num_dims      = numel(pde.dimensions);
 
 num_elem = numel(A_data.element_global_row_index);
 
-ftmpA = ftmp;
+ftmpA = chop(ftmp);
 
 element_DOF = deg^num_dims;
 
@@ -45,19 +47,19 @@ else
     num_A = total_DOF * total_DOF; 
 end
 
-ALHS = 0;
-A = 0;
+ALHS = chop(0);
+A = chop(0);
 if opts.build_A
     if opts.use_sparse_A
-        A_s1 = zeros(num_A,1); 
-        A_s2 = zeros(num_A,1);
-        A_s3 = zeros(num_A,1);
+        A_s1 = chop(zeros(num_A,1)); 
+        A_s2 = chop(zeros(num_A,1));
+        A_s3 = chop(zeros(num_A,1));
     else
-        A = zeros(total_DOF,total_DOF); % Only filled if using hand coded implicit methods
+        A = chop(zeros(total_DOF,total_DOF)); % Only filled if using hand coded implicit methods
     end
 end
 if num_terms_LHS > 0
-    ALHS = zeros(total_DOF,total_DOF); % Only filled if non-identity LHS mass matrix
+    ALHS = chop(zeros(total_DOF,total_DOF)); % Only filled if non-identity LHS mass matrix
 end
 
 cnt = 1;
@@ -127,7 +129,7 @@ for elem=1:num_elem
             for d=1:num_dims
                 idx_i = Index_I{d};
                 idx_j = Index_J{d};
-                tmp = pde.terms{t}.terms_1D{d}.mat;
+                tmp = chop(pde.terms{t}.terms_1D{d}.mat);
                 kron_mat_list{d} = tmp(idx_i,idx_j); % List of tmpA, tmpB, ... tmpD used in kron_mult
                 %disp(sprintf('kron_mat_list(133) class is %s', class(kron_mat_list{d}) ));
             end
@@ -204,7 +206,7 @@ end
 
 if opts.build_A && opts.use_sparse_A
     A = sparse(A_s2,A_s1,A_s3,total_DOF,total_DOF);
-    %disp(sprintf('A(200) class is %s', class(A) ));
+    disp(sprintf('A(200) class is %s', class(A) ));
 end
 
 if opts.build_A && ~opts.quiet; disp('DONE'); end

@@ -212,6 +212,23 @@ else
 end
 
 fval_analytic = exact_solution_vector(pde,opts,hash_table,t);
+%fileID = fopen('./data/applyAsingle/adaptRK3-50steps-threshold-1e-1-fval-analytic-and-simulated-pretendStep-double-realStep-double.data','w');
+%fileID = fopen('./data/applyAsingle/adaptRK3-50steps-threshold-1e-1-fval-analytic-and-simulated-pretendStep-single-realStep-double.data','w');
+%fileID = fopen('./data/applyAsingle/adaptRK3-50steps-threshold-1e-1-fval-analytic-and-simulated-pretendStep-single-realStep-single.data','w');
+fileID = fopen('./dataproof/toto.txt','w');
+%fprintf(fileID,'asgard(@fokkerplanck1_pitch_E,\"lev\",4,\"deg\",2,\"timestep_method\",\"RK3\",\"dt\",0.01,\"num_steps\",1,\"case\",2,\"save_output\",true,\"calculate_mass\",false,\"adapt_initial_condition\",true,\"adapt_threshold\",1e-1,\"adapt\",true)\n')
+fprintf(fileID,'Wavelet space analytic: ');
+for n=1:numel(fval_analytic)
+    fprintf(fileID,'%d ',fval_analytic(n));
+end
+fprintf(fileID,'\n');
+
+fprintf(fileID,'Wavelet space simulated: ');
+for n=1:numel(fval)
+    fprintf(fileID,'%d ',fval(n));
+end
+fprintf(fileID,'\n');
+
 err_wavelet = sqrt(mean((fval(:) - fval_analytic(:)).^2));
 if ~opts.quiet
     disp(['    num_dof : ', num2str(numel(fval))]);
@@ -222,9 +239,23 @@ end
 
 if num_dims <=3
     fval_realspace = wavelet_to_realspace(pde,opts,Meval,fval,hash_table);
-    fval_realspace_analytic = get_analytic_realspace_solution_D(pde,opts,coord,t);
+    fval_realspace_analytic = double(get_analytic_realspace_solution_D(pde,opts,coord,t));
+
+    fprintf(fileID,'Real space analytic: ');
+    for n=1:numel(fval_realspace_analytic)
+        fprintf(fileID,'%d ',fval_realspace_analytic(n));
+    end
+    fprintf(fileID,'\n');
+
+    fprintf(fileID,'Real space simulated: ');
+    for n=1:numel(fval_realspace)
+        fprintf(fileID,'%d ',fval_realspace(n));
+    end
+    fprintf(fileID,'\n');
+
     err_realspace = sqrt(mean((fval_realspace(:) - fval_realspace_analytic(:)).^2));
-    if ~opts.quiet
+    %TODO
+    if opts.quiet
         disp(['    real space absolute err : ', num2str(err_realspace)]);
         disp(['    real space relative err : ', num2str(err_realspace/max(abs(fval_realspace_analytic(:)))*100), ' %']);
         disp(['    real space absolute err (2-norm) : ', num2str(norm(fval_realspace(:)-fval_realspace_analytic(:)))]);
@@ -305,12 +336,22 @@ for L = 1:opts.num_steps
         if write_A_data && L==1; write_A_data_to_file(A_data,lev,deg); end
         
         fval_unstepped = fval;
-        fval = time_advance(pde,opts,A_data,fval,t,dt,opts.deg,hash_table,[],[]);
+        disp('Pretend Step Time advance');
+        %% PRETEND STEP time advance
+        fval = time_advance_chop(pde,opts,A_data,fval,t,dt,opts.deg,hash_table,[],[]);
+        %disp(sprintf('TimeAdvanceSingle(308) class of A_data.element_global_row_index is %s', class(A_data.element_global_row_index) ));
+        %dims = pde.dimensions;
+        %nDims = numel(dims);
+        %for d=1:nDims
+        %    disp(sprintf('TimeAdvanceSingle(308) class of A_data.element_local_index_D is %s', class(A_data.element_local_index_D{d}) ));
+        %end
+        %disp(sprintf('TimeAdvanceSingle(308) class of pde is %s', class(pde) ));
+        %disp(sprintf('TimeAdvanceSingle(308) class of fval is %s', class(fval) ));
         fval_realspace = wavelet_to_realspace(pde,opts,Meval,fval,hash_table);
         
         %%
         % Refine Grid - determine which elements to add, but reset fval to
-        % fval_previous with those new elements added and time_advance
+        % fval_previous with those new elements added and t_ime_advance
         % again
         
         if opts.adapt
@@ -334,7 +375,17 @@ for L = 1:opts.num_steps
                     disp(['    t = ', num2str(t)]);
                 end
                 needs_adapting = false;
-                fval = time_advance(pde,opts,A_data,fval_unstepped_adapted,t,dt,opts.deg,hash_table,[],[]);
+                disp('Time advance');
+                %% REAL STEP time advance
+                fval = time_advance_chop(pde,opts,A_data,fval_unstepped_adapted,t,dt,opts.deg,hash_table,[],[]);
+                %disp(sprintf('TimeAdvanceSingle(346) class of A_data.element_global_row_index is %s', class(A_data.element_global_row_index) ));
+                %dims = pde.dimensions;
+                %nDims = numel(dims);
+                %for d=1:nDims
+                %    disp(sprintf('TimeAdvanceSingle(346) class of A_data.element_local_index_D is %s', class(A_data.element_local_index_D{d}) ));
+                %end
+                %disp(sprintf('TimeAdvanceSingle(341) class of pde is %s', class(pde) ));
+                %disp(sprintf('TimeAdvanceSingle(341) class of fval is %s', class(fval) ));
                 fval_realspace = wavelet_to_realspace(pde,opts,Meval,fval,hash_table);
             else
                 if ~opts.quiet
@@ -396,13 +447,26 @@ for L = 1:opts.num_steps
         % Check the wavelet space solution with the analytic solution
         
         fval_analytic = exact_solution_vector(pde,opts,hash_table,t+dt);
-        
+        %disp(sprintf('fval_analytic %s\n',fval_analytic));
+        fprintf(fileID,'wavelet space analytic: ');
+        for n=1:numel(fval_analytic)
+            fprintf(fileID,'%d ',fval_analytic(n));
+        end
+        fprintf(fileID,'\n');
+        fprintf(fileID,'wavelet space simulated: ');
+        for n=1:numel(fval)
+            fprintf(fileID,'%d ',fval(n));
+        end
+        fprintf(fileID,'\n');
+        %disp(fval_analytic)
+        %disp(sprintf('class of fval_analytic is %s', class(fval_analytic) ));
+
         assert(numel(fval)==numel(fval_analytic));
-        
+
         err_wavelet = sqrt(mean((fval(:) - fval_analytic(:)).^2));
         outputs.err{L+1} = err_wavelet;
         outputs.rel_err{L+1} = err_wavelet/norm(fval_analytic(:),Inf);
-        if ~opts.quiet  
+        if ~opts.quiet
             disp(['    num_dof : ', num2str(numel(fval))]);
             disp(['    wavelet space absolute err : ', num2str(err_wavelet)]);
             disp(['    wavelet space relative err : ', num2str(err_wavelet/norm(fval_analytic(:),Inf)*100), ' %']);
@@ -418,8 +482,20 @@ for L = 1:opts.num_steps
             end
             
             fval_realspace_analytic = get_analytic_realspace_solution_D(pde,opts,coord,t+dt);
+            fprintf(fileID,'Real space analytic: ');
+            for n=1:numel(fval_realspace_analytic)
+                fprintf(fileID,'%d ',fval_realspace_analytic(n));
+            end
+            fprintf(fileID,'\n');
+            fprintf(fileID,'Real space simulated: ');
+            for n=1:numel(fval_realspace)
+                fprintf(fileID,'%d ',fval_realspace(n));
+            end
+            fprintf(fileID,'\n');
+
             err_realspace = sqrt(mean((fval_realspace(:) - fval_realspace_analytic(:)).^2));
-            if ~opts.quiet
+            %TODO
+            if opts.quiet
                 disp(['    real space absolute err : ', num2str(err_realspace)]);
                 disp(['    real space relative err : ', num2str(err_realspace/max(abs(fval_realspace_analytic(:)))*100), ' %']);
                 if opts.calculate_mass

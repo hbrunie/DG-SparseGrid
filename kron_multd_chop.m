@@ -7,6 +7,8 @@ function Y = kron_multd( nkron, Acell, X )
 %for d=1:numel(Acell)
 %    disp(sprintf('kron_multd %s \n',class(Acell{d})));
 %end
+options.format = 'h'; options.round = 1; options.subnormal = 1;
+chop([],options)
 
 isok = (length(Acell) >= nkron);
 if (~isok)
@@ -33,17 +35,17 @@ end
 
 if (nkron == 1)
   nc = size(Acell{1},2);
-  Y = Acell{1} * reshape(X, [nc, prod(size(X))/nc]);
+  Y = chop(Acell{1}) * chop(reshape(X, [nc, prod(size(X))/nc]));
 elseif (nkron == 2),
-  Y = kronmult2( Acell{1}, Acell{2}, X );
+  Y = chop(kronmult2( Acell{1}, Acell{2}, X ));
 elseif (nkron == 3),
-  Y = kronmult3( Acell{1}, Acell{2}, Acell{3}, X );
+  Y = chop(kronmult3( Acell{1}, Acell{2}, Acell{3}, X ));
 elseif (nkron == 4),
-  Y = kronmult4( Acell{1}, Acell{2}, Acell{3}, Acell{4}, X );
+  Y = chop(kronmult4( Acell{1}, Acell{2}, Acell{3}, Acell{4}, X ));
 elseif (nkron == 5),
-  Y = kronmult5( Acell{1}, Acell{2}, Acell{3}, Acell{4}, Acell{5},X );
+  Y = chop(kronmult5( Acell{1}, Acell{2}, Acell{3}, Acell{4}, Acell{5},X ));
 elseif (nkron == 6),
-  Y = kronmult6( Acell{1}, Acell{2}, Acell{3}, Acell{4}, Acell{5},Acell{6},X );
+  Y = chop(kronmult6( Acell{1}, Acell{2}, Acell{3}, Acell{4}, Acell{5},Acell{6},X ));
 else
   % ------------------------------
   % general case require recursion
@@ -65,7 +67,7 @@ else
   %
   % transpose( (  kron(A(1)...A(nkron-1))*transpose(Z)  )
   % -------------------------------
-  X = reshape( X, isizeX,nvec);
+  X = chop(reshape( X, isizeX,nvec));
 
 
   for k=1:nvec
@@ -73,7 +75,7 @@ else
    Xk = X(:,k);
 
    nc = size(Acell{nkron},2);
-   Z = Acell{nkron} * reshape( Xk, [nc, prod(size(Xk))/nc]);
+   Z = chop(Acell{nkron}) * chop(reshape( Xk, [nc, prod(size(Xk))/nc]));
  
    nc2 = prod( rc(2,1:(nkron-1)) );
    isok = mod(prod(size(Z)),nc2) == 0;
@@ -83,9 +85,9 @@ else
     return;
    end
 
-   Ytmp = kron_multd( nkron-1,Acell, transpose(Z));
+   Ytmp = chop(kron_multd( nkron-1,Acell, transpose(Z)));
 
   
-   Y(:,k) = reshape(transpose(Ytmp), [isizeY,1]);
+   Y(:,k) = chop(reshape(transpose(Ytmp), [isizeY,1]));
   end
 end
